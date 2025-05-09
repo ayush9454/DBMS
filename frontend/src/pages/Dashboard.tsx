@@ -3,69 +3,52 @@ import {
   Box,
   Container,
   Typography,
+  Card,
+  CardContent,
+  CircularProgress,
   Grid,
-  Paper,
-  IconButton,
-  Tooltip,
-  useTheme,
 } from '@mui/material';
-import {
-  DirectionsCar,
-  AccessTime,
-  AttachMoney,
-  LocationOn,
-  Event,
-  Download,
-  Cancel,
-} from '@mui/icons-material';
-import { motion, AnimatePresence } from 'framer-motion';
+import { DirectionsCar, AccessTime, AttachMoney } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-
-const MotionPaper = motion(Paper);
-const MotionBox = motion(Box);
+import { useTheme } from '@mui/material/styles';
+import api from '../config/api';
 
 interface Booking {
   id: string;
-  parkingLot: string;
+  parkingLotName: string;
+  address: string;
   spotNumber: string;
   startTime: string;
   endTime: string;
-  status: 'active' | 'completed' | 'cancelled';
+  duration: number;
   amount: number;
-  location: string;
+  status: 'active' | 'completed' | 'cancelled';
 }
 
 const Dashboard: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    // Load initial bookings from localStorage
-    const loadBookings = () => {
-      const storedBookings = JSON.parse(localStorage.getItem('bookings') || '[]');
-      setBookings(storedBookings);
-    };
-
-    // Load initial data
-    loadBookings();
-
-    // Create a custom event for real-time updates
-    const handleBookingUpdate = (e: CustomEvent) => {
-      loadBookings();
-    };
-
-    // Add event listener for custom event
-    window.addEventListener('bookingUpdate', handleBookingUpdate as EventListener);
-
-    // Set up polling for updates every 5 seconds
-    const pollInterval = setInterval(loadBookings, 5000);
-
-    return () => {
-      window.removeEventListener('bookingUpdate', handleBookingUpdate as EventListener);
-      clearInterval(pollInterval);
-    };
+    fetchBookings();
   }, []);
+
+  const fetchBookings = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/bookings');
+      setBookings(response.data);
+      setError('');
+    } catch (err: any) {
+      setError('Failed to fetch bookings. Please try again later.');
+      console.error('Error fetching bookings:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const calculateTotalSpent = () => {
     const validBookings = bookings.filter(b => 
@@ -81,7 +64,7 @@ const Dashboard: React.FC = () => {
       title: 'Active Bookings',
       value: bookings.filter(b => b.status === 'active').length,
       icon: <DirectionsCar sx={{ fontSize: 40 }} />,
-      color: '#0078d4',
+      color: theme.palette.primary.main,
     },
     {
       title: 'Hours Parked',
@@ -91,187 +74,94 @@ const Dashboard: React.FC = () => {
         return total + (end.getTime() - start.getTime()) / (1000 * 60 * 60);
       }, 0).toFixed(1),
       icon: <AccessTime sx={{ fontSize: 40 }} />,
-      color: '#0078d4',
+      color: theme.palette.secondary.main,
+    },
+    {
+      title: 'Total Spent',
+      value: `₹${calculateTotalSpent().toFixed(2)}`,
+      icon: <AttachMoney sx={{ fontSize: 40 }} />,
+      color: theme.palette.success.main,
     },
   ];
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-      },
-    },
-  };
-
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: {
-        type: 'spring',
-        stiffness: 100,
-      },
-    },
-    hover: {
-      scale: 1.05,
-      transition: {
-        type: 'spring',
-        stiffness: 400,
-      },
-    },
-  };
-
-  const handleDownloadTicket = (booking: Booking) => {
-    const ticketContent = `
-Smart Parking Ticket
--------------------
-Booking ID: ${booking.id}
-Parking Lot: ${booking.parkingLot}
-Spot Number: ${booking.spotNumber}
-Location: ${booking.location}
-Start Time: ${new Date(booking.startTime).toLocaleString()}
-End Time: ${new Date(booking.endTime).toLocaleString()}
-Amount: ₹${booking.amount}
-Status: ${booking.status}
-    `;
-
-    const blob = new Blob([ticketContent], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `parking-ticket-${booking.id}.txt`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
-
-  const handleCancelBooking = (bookingId: string) => {
-    const updatedBookings = bookings.map(booking =>
-      booking.id === bookingId
-        ? { ...booking, status: 'cancelled' as const }
-        : booking
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <CircularProgress />
+      </Box>
     );
-    setBookings(updatedBookings);
-    localStorage.setItem('bookings', JSON.stringify(updatedBookings));
-    
-    // Dispatch custom event for real-time update
-    window.dispatchEvent(new CustomEvent('bookingUpdate'));
-  };
+  }
+
+  if (error) {
+    return (
+      <Container>
+        <Typography color="error" sx={{ mt: 4, textAlign: 'center' }}>
+          {error}
+        </Typography>
+      </Container>
+    );
+  }
 
   return (
-    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: 4 }}>
-      <Container maxWidth="lg">
-        <MotionBox
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          <Typography
-            variant="h4"
-            component="h1"
-            gutterBottom
-            sx={{ color: 'text.primary', mb: 4 }}
-          >
-            Dashboard
-          </Typography>
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Typography variant="h4" component="h1" gutterBottom>
+        Dashboard
+      </Typography>
 
-          {/* Stats Section */}
-          <Grid container spacing={3} sx={{ mb: 6 }}>
-            {stats.map((stat, index) => (
-              <div key={index} style={{ width: '100%' }}>
-                <MotionPaper
-                  variants={itemVariants}
-                  whileHover="hover"
-                  sx={{
-                    p: 3,
-                    bgcolor: 'background.paper',
-                    borderRadius: 2,
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    textAlign: 'center',
-                    border: '1px solid #e0e0e0',
-                  }}
-                >
-                  <Box sx={{ color: stat.color, mb: 2 }}>
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        {stats.map((stat, index) => (
+          <Grid item xs={12} sm={6} md={4} key={index} component="div">
+            <Card sx={{ height: '100%' }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <Box sx={{ color: stat.color, mr: 2 }}>
                     {stat.icon}
                   </Box>
-                  <Typography
-                    variant="h4"
-                    component="div"
-                    sx={{ color: 'text.primary', mb: 1 }}
-                  >
-                    {stat.value}
-                  </Typography>
-                  <Typography
-                    variant="body1"
-                    sx={{ color: 'text.secondary' }}
-                  >
+                  <Typography variant="h6" component="div">
                     {stat.title}
                   </Typography>
-                </MotionPaper>
-              </div>
-            ))}
+                </Box>
+                <Typography variant="h4" component="div" sx={{ color: stat.color }}>
+                  {stat.value}
+                </Typography>
+              </CardContent>
+            </Card>
           </Grid>
+        ))}
+      </Grid>
 
-          {/* Quick Actions */}
-          <MotionBox variants={itemVariants}>
-            <Typography
-              variant="h5"
-              component="h2"
-              sx={{ color: 'text.primary', mb: 3 }}
-            >
-              Quick Actions
-            </Typography>
-            <Grid container spacing={3}>
-              <div style={{ width: '100%' }}>
-                <MotionPaper
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => navigate('/parking-lots')}
-                  sx={{
-                    p: 3,
-                    bgcolor: 'background.paper',
-                    borderRadius: 2,
-                    cursor: 'pointer',
-                    textAlign: 'center',
-                    border: '1px solid #e0e0e0',
-                  }}
-                >
-                  <DirectionsCar sx={{ fontSize: 40, color: 'primary.main', mb: 2 }} />
-                  <Typography variant="h6" sx={{ color: 'text.primary' }}>
-                    Find Parking
+      <Typography variant="h5" gutterBottom>
+        Recent Bookings
+      </Typography>
+
+      <Grid container spacing={3}>
+        {bookings.slice(0, 3).map((booking) => (
+          <Grid item xs={12} key={booking.id} component="div">
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  {booking.parkingLotName}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" paragraph>
+                  {booking.address}
+                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Spot: {booking.spotNumber}
                   </Typography>
-                </MotionPaper>
-              </div>
-              <div style={{ width: '100%' }}>
-                <MotionPaper
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => navigate('/bookings')}
-                  sx={{
-                    p: 3,
-                    bgcolor: 'background.paper',
-                    borderRadius: 2,
-                    cursor: 'pointer',
-                    textAlign: 'center',
-                    border: '1px solid #e0e0e0',
-                  }}
-                >
-                  <AccessTime sx={{ fontSize: 40, color: 'primary.main', mb: 2 }} />
-                  <Typography variant="h6" sx={{ color: 'text.primary' }}>
-                    View Bookings
+                  <Typography variant="body2" color="text.secondary">
+                    Duration: {booking.duration} hours
                   </Typography>
-                </MotionPaper>
-              </div>
-            </Grid>
-          </MotionBox>
-        </MotionBox>
-      </Container>
-    </Box>
+                  <Typography variant="body2" color="primary">
+                    ₹{booking.amount.toFixed(2)}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+    </Container>
   );
 };
 

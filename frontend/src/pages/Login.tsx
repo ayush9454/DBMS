@@ -37,24 +37,10 @@ const Login: React.FC = () => {
     setError('');
 
     try {
-      // Mock login - replace with actual API call
-      if (formData.email === 'admin@example.com' && formData.password === 'admin123') {
-        login({ email: formData.email, role: 'admin' });
-        navigate('/dashboard');
-      } else if (formData.email === 'user@example.com' && formData.password === 'user123') {
-        login({ email: formData.email, role: 'user' });
-        navigate('/dashboard');
-      } else if ((formData.email === 'jk123' || formData.email === 'jk123@gmail.com') && formData.password === '1234') {
-        login({ email: formData.email, role: 'user' });
-        navigate('/dashboard');
-      } else if ((formData.email === 'ayu123' || formData.email === 'ayu123@example.com') && formData.password === '1234') {
-        login({ email: formData.email, role: 'user' });
-        navigate('/dashboard');
-      } else {
-        setError('Invalid credentials');
-      }
-    } catch (err) {
-      setError('An error occurred during login');
+      await login({ ...formData, role: 'user' });
+      navigate('/dashboard');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'An error occurred during login');
     }
   };
 
@@ -105,6 +91,11 @@ const Login: React.FC = () => {
           >
             Sign In
           </Button>
+          <Box sx={{ textAlign: 'center' }}>
+            <Link component={RouterLink} to="/register" variant="body2">
+              {"Don't have an account? Sign Up"}
+            </Link>
+          </Box>
         </Box>
       </Box>
     </Container>

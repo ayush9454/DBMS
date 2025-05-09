@@ -1,109 +1,115 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  Box,
-  Paper,
-  Typography,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   Button,
-  Divider,
-  Grid,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Typography,
+  Box,
 } from '@mui/material';
-import {
-  DirectionsCar,
-  AccessTime,
-  LocationOn,
-  Payment,
-  QrCode2,
-} from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import api from '../config/api';
 
-interface BookingConfirmationProps {
-  bookingDetails: {
-    parkingLotName: string;
-    address: string;
-    bookingId: string;
-    startTime: string;
-    endTime: string;
-    duration: number;
-    totalAmount: number;
-    spotNumber: string;
-  };
+interface ParkingLot {
+  id: number;
+  name: string;
+  address: string;
+  availableSpots: number;
+  totalSpots: number;
+  rate: number;
 }
 
-const BookingConfirmation: React.FC<BookingConfirmationProps> = ({ bookingDetails }) => {
-  const navigate = useNavigate();
+interface BookingConfirmationProps {
+  open: boolean;
+  onClose: () => void;
+  parkingLot: ParkingLot;
+}
+
+const BookingConfirmation: React.FC<BookingConfirmationProps> = ({
+  open,
+  onClose,
+  parkingLot,
+}) => {
+  const [duration, setDuration] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleConfirmBooking = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const response = await api.post('/bookings', {
+        parkingLotId: parkingLot.id,
+        duration,
+      });
+
+      // Handle successful booking
+      onClose();
+      // You might want to trigger a refresh of the parking lots list here
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to create booking');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', display: 'flex', alignItems: 'center', justifyContent: 'center', py: 8 }}>
-      <Paper elevation={6} sx={{ p: 5, maxWidth: 420, width: '100%', bgcolor: 'background.paper', color: 'text.primary', borderRadius: 3 }}>
-        <Typography variant="h5" align="center" gutterBottom sx={{ color: 'primary.main', fontWeight: 700 }}>
-          Booking Confirmed!
-        </Typography>
-        <Typography align="center" sx={{ mb: 3, color: 'text.secondary' }}>
-          Your parking space has been reserved
-        </Typography>
-        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
-          <Box sx={{ bgcolor: 'primary.main', p: 2, borderRadius: 2 }}>
-            <QrCode2 sx={{ fontSize: 48, color: '#fff' }} />
-          </Box>
-        </Box>
-        <Typography align="center" sx={{ mb: 2, color: 'text.secondary' }}>
-          Booking ID:
-        </Typography>
-        <Typography align="center" sx={{ mb: 3, fontWeight: 600, color: 'text.primary' }}>
-          {bookingDetails.bookingId}
-        </Typography>
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600, color: 'text.primary' }}>
-            {bookingDetails.parkingLotName}
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Book Parking Space</DialogTitle>
+      <DialogContent>
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="h6" gutterBottom>
+            {parkingLot.name}
           </Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
-            {bookingDetails.address}
+          <Typography variant="body2" color="text.secondary" paragraph>
+            {parkingLot.address}
           </Typography>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Spot Number
+
+          <FormControl fullWidth sx={{ mt: 2 }}>
+            <InputLabel>Duration (hours)</InputLabel>
+            <Select
+              value={duration}
+              onChange={(e) => setDuration(Number(e.target.value))}
+              label="Duration (hours)"
+            >
+              {[1, 2, 3, 4, 5, 6, 8, 12, 24].map((hours) => (
+                <MenuItem key={hours} value={hours}>
+                  {hours} {hours === 1 ? 'hour' : 'hours'}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <Typography variant="h6" color="primary" sx={{ mt: 2 }}>
+            Total Amount: ₹{(parkingLot.rate * duration).toFixed(2)}
+          </Typography>
+
+          {error && (
+            <Typography color="error" sx={{ mt: 2 }}>
+              {error}
             </Typography>
-            <Typography variant="body2" sx={{ color: 'text.primary' }}>
-              {bookingDetails.spotNumber}
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Duration
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'text.primary' }}>
-              {bookingDetails.duration} hours
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Total Amount
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'primary.main', fontWeight: 600 }}>
-              ₹{bookingDetails.totalAmount.toFixed(2)}
-            </Typography>
-          </Box>
+          )}
         </Box>
-        <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-          <Button
-            variant="outlined"
-            fullWidth
-            onClick={() => navigate('/dashboard')}
-            sx={{ borderColor: 'primary.main', color: 'primary.main', '&:hover': { bgcolor: 'background.paper' } }}
-          >
-            View in Dashboard
-          </Button>
-          <Button
-            variant="contained"
-            fullWidth
-            onClick={() => window.print()}
-            sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
-          >
-            Download Ticket
-          </Button>
-        </Box>
-      </Paper>
-    </Box>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={loading}>
+          Cancel
+        </Button>
+        <Button
+          onClick={handleConfirmBooking}
+          variant="contained"
+          disabled={loading}
+        >
+          {loading ? 'Processing...' : 'Confirm Booking'}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 };
 

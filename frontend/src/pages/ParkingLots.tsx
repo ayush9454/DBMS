@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Container,
@@ -17,322 +17,164 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  CircularProgress,
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import { Search, DirectionsCar } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import BookingConfirmation from '../components/BookingConfirmation';
+import api from '../config/api';
 
 const MotionCard = motion(Card);
 const MotionBox = motion(Box);
 
-// Mock data - replace with API call
-const mockParkingLots = [
-  {
-    id: 1,
-    name: 'MG Road Parking',
-    address: 'MG Road, Bangalore, Karnataka 560001',
-    availableSpots: 15,
-    totalSpots: 50,
-    rate: 50.00,
-  },
-  {
-    id: 2,
-    name: 'Koramangala Plaza',
-    address: '8th Block, Koramangala, Bangalore, Karnataka 560034',
-    availableSpots: 8,
-    totalSpots: 30,
-    rate: 40.00,
-  },
-  {
-    id: 3,
-    name: 'Indiranagar Complex',
-    address: '100 Feet Road, Indiranagar, Bangalore, Karnataka 560038',
-    availableSpots: 20,
-    totalSpots: 100,
-    rate: 45.00,
-  },
-  {
-    id: 4,
-    name: 'Whitefield Tech Park',
-    address: 'ITPL Road, Whitefield, Bangalore, Karnataka 560066',
-    availableSpots: 25,
-    totalSpots: 75,
-    rate: 35.00,
-  },
-  {
-    id: 5,
-    name: 'Electronic City',
-    address: 'Phase 1, Electronic City, Bangalore, Karnataka 560100',
-    availableSpots: 18,
-    totalSpots: 60,
-    rate: 30.00,
-  },
-];
+interface ParkingLot {
+  id: number;
+  name: string;
+  address: string;
+  availableSpots: number;
+  totalSpots: number;
+  rate: number;
+}
 
 const ParkingLots: React.FC = () => {
+  const [parkingLots, setParkingLots] = useState<ParkingLot[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedLot, setSelectedLot] = useState<any>(null);
-  const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
-  const [bookingDuration, setBookingDuration] = useState(1);
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const [bookingDetails, setBookingDetails] = useState<any>(null);
+  const [selectedLot, setSelectedLot] = useState<ParkingLot | null>(null);
+  const [showBookingDialog, setShowBookingDialog] = useState(false);
 
-  const filteredLots = mockParkingLots.filter(
-    (lot) =>
-      lot.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      lot.address.toLowerCase().includes(searchQuery.toLowerCase())
+  useEffect(() => {
+    fetchParkingLots();
+  }, []);
+
+  const fetchParkingLots = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/parking-lots');
+      setParkingLots(response.data);
+      setError('');
+    } catch (err: any) {
+      setError('Failed to fetch parking lots. Please try again later.');
+      console.error('Error fetching parking lots:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(event.target.value);
+  };
+
+  const filteredLots = parkingLots.filter(lot =>
+    lot.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    lot.address.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleBookNow = (lot: any) => {
+  const handleBookNow = (lot: ParkingLot) => {
     setSelectedLot(lot);
-    setBookingDialogOpen(true);
+    setShowBookingDialog(true);
   };
 
-  const handleConfirmBooking = () => {
-    const spotNumber = `A${Math.floor(Math.random() * 100)}`;
-    const startTime = new Date().toLocaleString();
-    const endTime = new Date(Date.now() + bookingDuration * 60 * 60 * 1000).toLocaleString();
-    const totalAmount = selectedLot.rate * bookingDuration;
-
-    const bookingDetails = {
-      id: `BK${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-      parkingLotName: selectedLot.name,
-      address: selectedLot.address,
-      spotNumber,
-      startTime,
-      endTime,
-      duration: bookingDuration,
-      totalAmount,
-      status: 'active' as const,
-    };
-
-    // Store booking in localStorage
-    const existingBookings = JSON.parse(localStorage.getItem('bookings') || '[]');
-    const updatedBookings = [...existingBookings, bookingDetails];
-    localStorage.setItem('bookings', JSON.stringify(updatedBookings));
-
-    setBookingDetails(bookingDetails);
-    setBookingDialogOpen(false);
-    setShowConfirmation(true);
+  const handleCloseBookingDialog = () => {
+    setShowBookingDialog(false);
+    setSelectedLot(null);
   };
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  };
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: {
-        type: "spring",
-        stiffness: 100
-      }
-    }
-  };
-
-  if (showConfirmation && bookingDetails) {
-    return <BookingConfirmation bookingDetails={bookingDetails} />;
+  if (error) {
+    return (
+      <Container>
+        <Typography color="error" sx={{ mt: 4, textAlign: 'center' }}>
+          {error}
+        </Typography>
+      </Container>
+    );
   }
 
   return (
-    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: 4 }}>
-      <Container maxWidth="lg">
-        <MotionBox
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <Typography
-            variant="h4"
-            component="h1"
-            gutterBottom
-            sx={{ color: 'text.primary', mb: 4 }}
-          >
-            Available Parking Lots
-          </Typography>
-        </MotionBox>
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Available Parking Lots
+        </Typography>
+        <TextField
+          fullWidth
+          variant="outlined"
+          placeholder="Search by name or location..."
+          value={searchQuery}
+          onChange={handleSearch}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search />
+              </InputAdornment>
+            ),
+          }}
+          sx={{ mb: 4 }}
+        />
+      </Box>
 
-        <MotionBox
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-        >
-          <TextField
-            fullWidth
-            variant="outlined"
-            placeholder="Search parking lots..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            sx={{
-              mb: 4,
-              bgcolor: 'background.paper',
-              borderRadius: 2,
-            }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search sx={{ color: '#b3b3b3' }} />
-                </InputAdornment>
-              ),
-            }}
-          />
-        </MotionBox>
-
-        <Grid container spacing={3} component={motion.div} variants={containerVariants} initial="hidden" animate="visible">
+      <Grid container spacing={3}>
+        <AnimatePresence>
           {filteredLots.map((lot) => (
-            <div key={lot.id} style={{ width: '100%' }}>
+            <Grid item xs={12} sm={6} md={4} key={lot.id}>
               <MotionCard
-                whileHover={{ y: -10 }}
-                sx={{
-                  height: '100%',
-                  bgcolor: 'background.paper',
-                  borderRadius: 2,
-                  border: '1px solid #e0e0e0',
-                  transition: 'transform 0.3s ease-in-out',
-                }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+                sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}
               >
-                <CardContent>
-                  <MotionBox
-                    whileHover={{ scale: 1.05 }}
-                    transition={{ type: "spring", stiffness: 300 }}
-                  >
-                    <Typography variant="h6" gutterBottom sx={{ color: 'text.primary' }}>
-                      {lot.name}
-                    </Typography>
-                  </MotionBox>
-                  <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+                <CardContent sx={{ flexGrow: 1 }}>
+                  <Typography variant="h6" component="h2" gutterBottom>
+                    {lot.name}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" paragraph>
                     {lot.address}
                   </Typography>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      Available Spots:
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
-                      {lot.availableSpots}/{lot.totalSpots}
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                    <DirectionsCar sx={{ mr: 1, color: 'primary.main' }} />
+                    <Typography variant="body2">
+                      {lot.availableSpots} spots available out of {lot.totalSpots}
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      Rate:
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
-                      ₹{lot.rate}/hour
-                    </Typography>
-                  </Box>
+                  <Typography variant="h6" color="primary">
+                    ₹{lot.rate.toFixed(2)}/hour
+                  </Typography>
                 </CardContent>
                 <CardActions>
                   <Button
                     fullWidth
                     variant="contained"
-                    startIcon={<DirectionsCar />}
                     onClick={() => handleBookNow(lot)}
-                    sx={{
-                      bgcolor: 'primary.main',
-                      '&:hover': {
-                        bgcolor: 'primary.dark'
-                      }
-                    }}
+                    disabled={lot.availableSpots === 0}
                   >
-                    Book Now
+                    {lot.availableSpots === 0 ? 'No Spots Available' : 'Book Now'}
                   </Button>
                 </CardActions>
               </MotionCard>
-            </div>
+            </Grid>
           ))}
-        </Grid>
-
-        <AnimatePresence>
-          {bookingDialogOpen && (
-            <Dialog
-              open={bookingDialogOpen}
-              onClose={() => setBookingDialogOpen(false)}
-              PaperProps={{
-                sx: {
-                  bgcolor: 'background.paper',
-                  color: 'text.primary',
-                },
-              }}
-            >
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              >
-                <DialogTitle>Book Parking Space</DialogTitle>
-                <DialogContent>
-                  <MotionBox
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    sx={{ mt: 2 }}
-                  >
-                    <FormControl fullWidth sx={{ mb: 2 }}>
-                      <InputLabel sx={{ color: 'text.secondary' }}>Duration (hours)</InputLabel>
-                      <Select
-                        value={bookingDuration}
-                        onChange={(e) => setBookingDuration(Number(e.target.value))}
-                        label="Duration (hours)"
-                        sx={{
-                          color: 'text.primary',
-                          '& .MuiOutlinedInput-notchedOutline': {
-                            borderColor: 'text.secondary',
-                          },
-                          '&:hover .MuiOutlinedInput-notchedOutline': {
-                            borderColor: 'primary.main',
-                          },
-                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                            borderColor: 'primary.main',
-                          },
-                        }}
-                      >
-                        {[1, 2, 3, 4, 5, 6, 8, 12, 24].map((hours) => (
-                          <MenuItem key={hours} value={hours}>
-                            {hours} {hours === 1 ? 'hour' : 'hours'}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      Total Amount: ₹{selectedLot?.rate * bookingDuration}
-                    </Typography>
-                  </MotionBox>
-                </DialogContent>
-                <DialogActions>
-                  <Button
-                    onClick={() => setBookingDialogOpen(false)}
-                    sx={{ color: 'text.secondary' }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleConfirmBooking}
-                    variant="contained"
-                    sx={{
-                      bgcolor: 'primary.main',
-                      '&:hover': {
-                        bgcolor: 'primary.dark'
-                      }
-                    }}
-                  >
-                    Confirm Booking
-                  </Button>
-                </DialogActions>
-              </motion.div>
-            </Dialog>
-          )}
         </AnimatePresence>
-      </Container>
-    </Box>
+      </Grid>
+
+      {selectedLot && (
+        <BookingConfirmation
+          open={showBookingDialog}
+          onClose={handleCloseBookingDialog}
+          parkingLot={selectedLot}
+        />
+      )}
+    </Container>
   );
 };
 
